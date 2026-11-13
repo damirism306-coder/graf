@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Графы: вершины, рёбра, пути</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marck+Script&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f8fc;--grid:#cddbec;--ink:#1d3a8f;--text:#1c2430;--muted:#55627a;--pen:#c8372d;--card:#ffffffcc;--line:#9fb4d6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121c29;--grid:#22344a;--ink:#9fc0ff;--text:#e6ebf3;--muted:#9aa8bf;--pen:#ff8a80;--card:#162334cc;--line:#3b5273}}
+:root[data-theme="dark"]{--bg:#121c29;--grid:#22344a;--ink:#9fc0ff;--text:#e6ebf3;--muted:#9aa8bf;--pen:#ff8a80;--card:#162334cc;--line:#3b5273}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px;color:var(--text);font:18px/1.65 "PT Serif",Georgia,serif}
+main{max-width:880px;margin:0 auto;padding:40px 20px 72px}
+h1,h2{font-family:"Marck Script","Segoe Script","Comic Sans MS",cursive;color:var(--ink);font-weight:400;line-height:1.1;margin:0}
+h1{font-size:clamp(46px,9vw,84px)}
+h2{font-size:clamp(30px,5vw,40px);margin:56px 0 14px}
+.lead{max-width:60ch;color:var(--muted);margin:14px 0 24px}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:6px;padding:16px;backdrop-filter:blur(2px)}
+#g{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair;background:transparent}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;font-size:16px}
+button{font:inherit;font-size:15px;color:var(--ink);background:transparent;border:1.5px solid var(--ink);border-radius:4px;padding:6px 14px;cursor:pointer}
+button:hover{background:var(--ink);color:var(--bg)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--pen);outline-offset:2px}
+label{display:flex;gap:8px;align-items:center;cursor:pointer}
+.hint{color:var(--muted);font-size:15px;margin:10px 0 0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:16px}
+.stats p{margin:4px 0;font-size:16px}
+.pen{color:var(--pen)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;font-size:16px;margin-top:6px}
+td,th{border:1px solid var(--line);width:34px;height:34px;text-align:center;padding:0}
+th{color:var(--ink);font-weight:700}
+td.one{color:var(--pen);font-weight:700}
+dl{margin:0;display:grid;grid-template-columns:minmax(150px,200px) 1fr;gap:0 24px}
+dt{font-weight:700;color:var(--ink);padding:12px 0;border-top:1.5px solid var(--line)}
+dd{margin:0;padding:12px 0;border-top:1.5px solid var(--line)}
+@media(max-width:600px){dl{grid-template-columns:1fr}dt{padding-bottom:0}dd{border-top:0;padding-top:2px}}
+ul{padding-left:1.2em}li{margin:6px 0}
+.note{border-left:4px solid var(--pen);padding:4px 0 4px 16px;margin:20px 0}
+footer{margin-top:56px;color:var(--muted);font-size:15px}
+</style>
+</head>
+<body>
+<main>
+<h1>Графы</h1>
+<p class="lead">Граф показывает, что с чем связано: города и дороги, люди и дружба, страницы и ссылки. Ниже можно нарисовать свой граф и сразу увидеть его числа.</p>
+
+<section class="card" aria-label="Редактор графа">
+<svg id="g" viewBox="0 0 800 400" role="img" aria-label="Интерактивный граф"></svg>
+<div class="bar">
+<button id="demo" type="button">Пример</button>
+<button id="clear" type="button">Очистить</button>
+<label><input type="checkbox" id="dir"> Ориентированный граф</label>
+</div>
+<p class="hint">Клик по пустому месту добавляет вершину. Клик по двум вершинам по очереди соединяет их или убирает ребро. Вершину можно перетаскивать.</p>
+</section>
+
+<div class="stats">
+<div class="card" id="stats"></div>
+<div class="card scroll"><b>Матрица смежности</b><div id="mx"></div></div>
+</div>
+
+<h2>Основные понятия</h2>
+<dl>
+<dt>Граф</dt><dd>Пара множеств G = (V, E): вершины V и рёбра E, которые их соединяют.</dd>
+<dt>Вершина</dt><dd>Объект, который мы рисуем точкой: город, человек, страница.</dd>
+<dt>Ребро</dt><dd>Связь между двумя вершинами. У неё нет направления.</dd>
+<dt>Дуга</dt><dd>Ребро со стрелкой: связь идёт от одной вершины к другой, как улица с односторонним движением.</dd>
+<dt>Степень вершины</dt><dd>Число рёбер, которые к ней подходят. В ориентированном графе считают отдельно входящие и исходящие дуги.</dd>
+<dt>Путь</dt><dd>Последовательность вершин, где каждая соседняя пара соединена ребром. Длина пути равна числу рёбер в нём.</dd>
+<dt>Цикл</dt><dd>Путь, который начинается и заканчивается в одной вершине.</dd>
+<dt>Связный граф</dt><dd>Граф, в котором из любой вершины можно дойти до любой другой.</dd>
+</dl>
+
+<div class="note"><b class="pen">Проверьте на рисунке.</b> Сумма степеней всех вершин всегда равна удвоенному числу рёбер, потому что каждое ребро даёт вклад в степень двух вершин. Поэтому вершин с нечётной степенью всегда чётное количество.</div>
+
+<h2>Виды графов</h2>
+<ul>
+<li><b>Неориентированный.</b> Рёбра без направления: дружба в соцсети.</li>
+<li><b>Ориентированный.</b> Рёбра со стрелками: подписка, ссылка с одной страницы на другую.</li>
+<li><b>Взвешенный.</b> У каждого ребра есть число: расстояние, время, цена билета.</li>
+<li><b>Полный.</b> Каждая вершина соединена с каждой. У полного графа из n вершин n(n − 1)/2 рёбер.</li>
+<li><b>Дерево.</b> Связный граф без циклов. В нём всегда на одно ребро меньше, чем вершин.</li>
+</ul>
+
+<h2>Задача о кёнигсбергских мостах</h2>
+<p>В 1736 году Леонард Эйлер решал вопрос: можно ли пройти по всем семи мостам Кёнигсберга ровно по одному разу? Он заменил острова вершинами, мосты рёбрами и показал, что ответ зависит от степеней вершин. Так появилась теория графов.</p>
+<p>Правило Эйлера: в связном графе есть путь, проходящий по каждому ребру ровно один раз, если вершин с нечётной степенью ноль или две. Рисунок выше сам проверяет это условие для вашего графа.</p>
+
+<h2>Где графы работают</h2>
+<ul>
+<li>Навигация: перекрёстки это вершины, дороги это рёбра с весом, а поиск маршрута это поиск кратчайшего пути.</li>
+<li>Интернет: страницы связаны ссылками, и поисковик обходит этот граф.</li>
+<li>Расписания и турниры: кто с кем играет и какие занятия не могут идти одновременно.</li>
+<li>Программирование: графы хранят в виде матрицы смежности (справа от рисунка) или списков соседей.</li>
+</ul>
+
+<footer>Цель обучения 11.2.1.1: объяснять основные понятия теории графов.</footer>
+</main>
+
+<script>
+(function(){
+var svg=document.getElementById('g'),NS='http://www.w3.org/2000/svg';
+var N=[],E=[],sel=null,drag=null,R=22,L='ABCDEFGHIJKL';
+function demo(){N=[{x:150,y:90},{x:400,y:60},{x:660,y:110},{x:250,y:300},{x:560,y:300}];E=[[0,1],[1,2],[0,3],[1,3],[2,4],[3,4]];sel=null;draw()}
+function has(a,b,d){return E.findIndex(function(e){return d?(e[0]==a&&e[1]==b):((e[0]==a&&e[1]==b)||(e[0]==b&&e[1]==a))})}
+function pt(ev){var p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(svg.getScreenCTM().inverse())}
+function deg(i){var o=0,n=0;E.forEach(function(e){if(e[0]==i)o++;if(e[1]==i)n++});return{o:o,n:n,t:o+n}}
+function draw(){
+var d=document.getElementById('dir').checked,h='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>';
+E.forEach(function(e){var a=N[e[0]],b=N[e[1]],dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1,ex=d?b.x-dx/l*(R+3):b.x,ey=d?b.y-dy/l*(R+3):b.y;
+h+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+ex+'" y2="'+ey+'" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"'+(d?' marker-end="url(#ar)"':'')+'/>'});
+N.forEach(function(p,i){var g=deg(i),s=sel===i;
+h+='<g data-i="'+i+'" style="cursor:grab"><circle cx="'+p.x+'" cy="'+p.y+'" r="'+R+'" fill="var(--bg)" stroke="'+(s?'var(--pen)':'var(--ink)')+'" stroke-width="'+(s?5:3)+'"/><text x="'+p.x+'" y="'+(p.y+6)+'" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)" font-family="PT Serif,serif" pointer-events="none">'+L[i]+'</text><text x="'+(p.x+R+4)+'" y="'+(p.y-R+2)+'" font-size="17" fill="var(--pen)" font-family="PT Serif,serif" pointer-events="none">'+(d?g.n+'/'+g.o:g.t)+'</text></g>'});
+svg.innerHTML=h;stats();matrix()}
+function stats(){
+var d=document.getElementById('dir').checked,v=N.length,m=E.length,sum=0,odd=0,i;
+for(i=0;i<v;i++){var g=deg(i);sum+=g.t;if(g.t%2)odd++}
+var seen={0:1},q=[0];while(q.length){var c=q.shift();E.forEach(function(e){var o=e[0]==c?e[1]:(e[1]==c?e[0]:-1);if(o>=0&&!seen[o]){seen[o]=1;q.push(o)}})}
+var conn=v>0&&Object.keys(seen).length==v,t='<p><b>Вершин:</b> '+v+'. <b>Рёбер:</b> '+m+'.</p>';
+t+='<p><b>Степени:</b> '+(v?N.map(function(_,i){var g=deg(i);return L[i]+(d?' (вх '+g.n+', исх '+g.o+')':' = '+g.t)}).join(', '):'вершин пока нет')+'</p>';
+if(!d)t+='<p>Сумма степеней: <span class="pen">'+sum+'</span> = 2 · '+m+'</p>';
+t+='<p><b>Связный:</b> '+(v==0?'—':(conn?'да':'нет'))+(d?' (если не учитывать стрелки)':'')+'</p>';
+if(!d&&v>1)t+='<p><b>Путь по всем рёбрам по одному разу:</b> '+(conn&&m>0&&(odd==0||odd==2)?'есть':'нет')+' (нечётных вершин: '+odd+')</p>';
+document.getElementById('stats').innerHTML=t}
+function matrix(){
+var d=document.getElementById('dir').checked,v=N.length;
+if(!v){document.getElementById('mx').innerHTML='<p class="hint">Добавьте вершины.</p>';return}
+var t='<table><tr><th></th>';for(var j=0;j<v;j++)t+='<th>'+L[j]+'</th>';t+='</tr>';
+for(var i=0;i<v;i++){t+='<tr><th>'+L[i]+'</th>';for(j=0;j<v;j++){var k=has(i,j,d)>=0?1:0;t+='<td'+(k?' class="one"':'')+'>'+k+'</td>'}t+='</tr>'}
+document.getElementById('mx').innerHTML=t+'</table>'}
+svg.addEventListener('pointerdown',function(ev){var n=ev.target.closest('[data-i]');drag={i:n?+n.getAttribute('data-i'):-1,x:ev.clientX,y:ev.clientY,moved:false};svg.setPointerCapture(ev.pointerId)});
+svg.addEventListener('pointermove',function(ev){if(!drag||drag.i<0)return;if(!drag.moved&&Math.hypot(ev.clientX-drag.x,ev.clientY-drag.y)<5)return;drag.moved=true;var p=pt(ev);N[drag.i].x=Math.max(R,Math.min(800-R,p.x));N[drag.i].y=Math.max(R,Math.min(400-R,p.y));draw()});
+svg.addEventListener('pointerup',function(ev){if(!drag)return;var dr=drag;drag=null;if(dr.moved)return;
+if(dr.i>=0){if(sel===null)sel=dr.i;else if(sel===dr.i)sel=null;else{var d=document.getElementById('dir').checked,k=has(sel,dr.i,d);if(k>=0)E.splice(k,1);else E.push([sel,dr.i]);sel=null}}
+else if(N.length<12){var p=pt(ev);N.push({x:Math.max(R,Math.min(800-R,p.x)),y:Math.max(R,Math.min(400-R,p.y))});sel=null}
+draw()});
+document.getElementById('demo').onclick=demo;
+document.getElementById('clear').onclick=function(){N=[];E=[];sel=null;draw()};
+document.getElementById('dir').onchange=function(){var s=[],o=[];E.forEach(function(e){if(has(e[0],e[1],true)>=0&&!s.some(function(x){return x[0]==e[0]&&x[1]==e[1]}))s.push(e)});E=s;draw()};
+demo();
+})();
+</script>
+</body>
+</html>
